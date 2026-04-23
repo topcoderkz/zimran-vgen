@@ -48,8 +48,10 @@ from src.api.routes.health import router as health_router  # noqa: E402
 from src.api.routes.campaigns import router as campaigns_router  # noqa: E402
 from src.api.routes.uploads import router as uploads_router  # noqa: E402
 from src.api.routes.results import router as results_router  # noqa: E402
+from src.api.routes.dlq import router as dlq_router  # noqa: E402
 
 app.include_router(health_router)
 app.include_router(campaigns_router)
 app.include_router(uploads_router)
 app.include_router(results_router)
+app.include_router(dlq_router)

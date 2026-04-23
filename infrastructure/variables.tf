@@ -38,3 +38,9 @@ variable "github_repo" {
   type        = string
   default     = "zimran-vgen"
 }
+
+variable "alert_email" {
+  description = "Email address for monitoring alert notifications"
+  type        = string
+  default     = "sandbox1@zimran.io"
+}

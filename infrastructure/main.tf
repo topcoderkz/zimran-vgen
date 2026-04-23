@@ -47,6 +47,7 @@ resource "google_project_iam_member" "api_roles" {
     "roles/datastore.user",
     "roles/storage.objectAdmin",
     "roles/pubsub.publisher",
+    "roles/pubsub.subscriber",
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
     "roles/iam.serviceAccountTokenCreator",
@@ -184,6 +185,10 @@ resource "google_cloud_run_v2_service" "api" {
         value = google_pubsub_topic.merge_tasks.name
       }
       env {
+        name  = "PUBSUB_DLQ_SUBSCRIPTION"
+        value = google_pubsub_subscription.dlq_consumer.name
+      }
+      env {
         name  = "CORS_ORIGINS"
         value = var.frontend_url
       }
@@ -290,62 +295,4 @@ resource "google_cloud_run_v2_service_iam_member" "frontend_public" {
 }
 
 # ---------- Monitoring ----------
-
-resource "google_monitoring_dashboard" "vgen" {
-  dashboard_json = jsonencode({
-    displayName = "VGen"
-    gridLayout = {
-      columns = 2
-      widgets = [
-        {
-          title = "Videos Processed"
-          xyChart = {
-            dataSets = [{
-              timeSeriesQuery = {
-                timeSeriesFilter = {
-                  filter = "metric.type=\"custom.googleapis.com/video_merger/videos_processed\""
-                }
-              }
-            }]
-          }
-        },
-        {
-          title = "Processing Time (ms)"
-          xyChart = {
-            dataSets = [{
-              timeSeriesQuery = {
-                timeSeriesFilter = {
-                  filter = "metric.type=\"custom.googleapis.com/video_merger/processing_time_ms\""
-                }
-              }
-            }]
-          }
-        },
-        {
-          title = "Errors"
-          xyChart = {
-            dataSets = [{
-              timeSeriesQuery = {
-                timeSeriesFilter = {
-                  filter = "metric.type=\"custom.googleapis.com/video_merger/errors\""
-                }
-              }
-            }]
-          }
-        },
-        {
-          title = "Pub/Sub Unacked Messages"
-          xyChart = {
-            dataSets = [{
-              timeSeriesQuery = {
-                timeSeriesFilter = {
-                  filter = "metric.type=\"pubsub.googleapis.com/subscription/num_undelivered_messages\" resource.type=\"pubsub_subscription\""
-                }
-              }
-            }]
-          }
-        },
-      ]
-    }
-  })
-}
+# See monitoring.tf for dashboard, alerts, uptime checks, and notification channels.

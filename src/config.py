@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     pubsub_topic: str = "merge-tasks"
     pubsub_subscription: str = "merge-tasks-sub"
     pubsub_dlq_topic: str = "merge-tasks-dlq"
+    pubsub_dlq_subscription: str = "merge-tasks-dlq-sub"
 
     # Firestore
     firestore_collection_prefix: str = ""
