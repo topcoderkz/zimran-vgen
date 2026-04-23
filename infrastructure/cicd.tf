@@ -10,27 +10,12 @@ resource "google_artifact_registry_repository" "vgen" {
 }
 
 # ---------- Cloud Build trigger ----------
-# NOTE: GitHub connection must be set up manually first in Cloud Build console:
-#   Cloud Build > Triggers > Connect Repository > GitHub
-# After connecting, update github.owner and github.name below.
-
-resource "google_cloudbuild_trigger" "deploy_on_push" {
-  name     = "vgen-deploy-on-push"
-  location = var.region
-
-  github {
-    owner = var.github_owner
-    name  = var.github_repo
-
-    push {
-      branch = "^main$"
-    }
-  }
-
-  filename = "cloudbuild.yaml"
-
-  depends_on = [google_project_service.apis]
-}
+# Created manually after connecting GitHub repo in Cloud Build console.
+# To create via CLI:
+#   gcloud builds triggers create github \
+#     --repo-name=zimran-vgen --repo-owner=topcoderkz \
+#     --branch-pattern="^main$" --build-config=cloudbuild.yaml \
+#     --region=us-central1 --project=sandbox-456317
 
 # ---------- Cloud Build IAM ----------
 # Cloud Build default SA: {project_number}@cloudbuild.gserviceaccount.com

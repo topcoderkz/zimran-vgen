@@ -4,8 +4,11 @@ Entry point: python -m src.worker.consumer
 """
 
 import json
+import os
 import signal
 import sys
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import structlog
 from google.cloud import pubsub_v1
@@ -28,9 +31,30 @@ def _handle_signal(signum: int, frame: object) -> None:
     _running = False
 
 
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'{"status":"healthy"}')
+
+    def log_message(self, *args: object) -> None:
+        pass  # suppress request logs
+
+
+def _start_health_server() -> None:
+    """Cloud Run requires a listening port. Serve a minimal health endpoint."""
+    port = int(os.environ.get("PORT", "8080"))
+    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logger.info("health_server_started", port=port)
+
+
 def main() -> None:
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
+
+    _start_health_server()
 
     settings = get_settings()
     setup_logging(settings.log_level)
