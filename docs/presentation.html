@@ -138,6 +138,8 @@
   .highlight-green { color: var(--green); font-weight: 600; }
   .highlight-yellow { color: var(--yellow); font-weight: 600; }
 
+  .aws { color: #f59e0b; font-size: 0.85em; font-weight: 400; }
+
   table {
     width: 100%;
     border-collapse: collapse;
@@ -258,7 +260,7 @@
   </p>
   <div style="margin-top:40px;">
     <span class="tag tag-done">Live on GCP</span>
-    <span class="tag" style="background:var(--accent-dim);color:var(--accent);">Cloud Run + Pub/Sub + GCS</span>
+    <span class="tag" style="background:var(--accent-dim);color:var(--accent);">Cloud Run <span class="aws">[Fargate]</span> + Pub/Sub <span class="aws">[SNS+SQS]</span> + GCS <span class="aws">[S3]</span></span>
   </div>
 </div>
 
@@ -306,7 +308,7 @@
     <div class="flow-step" style="border-color:var(--green);background:#14532d;">Download<br>Results</div>
   </div>
   <div style="margin-top:36px;">
-    <p>Files never pass through the API server. Browser uploads <span class="highlight">directly to Cloud Storage</span> via signed URLs.</p>
+    <p>Files never pass through the API server. Browser uploads <span class="highlight">directly to Cloud Storage <span class="aws">[S3]</span></span> via signed URLs.</p>
   </div>
 </div>
 
@@ -347,14 +349,14 @@
      |                    ^
      | signed URL upload  | signed URL download
      v                    |
-  Cloud Storage (GCS)     |
-  /uploads/  /outputs/ ---+
-     ^          ^
-     |          |
-  Cloud Run     Cloud Run (Workers)
-  (API)         FFmpeg merge, 1 per instance
-     |          pull from Pub/Sub
-     |             ^
+  Cloud Storage (GCS)     |            AWS equivalents:
+  /uploads/  /outputs/ ---+            GCS       = S3
+     ^          ^                      Cloud Run = ECS Fargate
+     |          |                      Pub/Sub   = SNS + SQS
+  Cloud Run     Cloud Run (Workers)    Firestore = DynamoDB
+  (API)         FFmpeg merge, 1 per    Cloud Build = CodePipeline
+     |          pull from Pub/Sub      Artifact Reg = ECR
+     |             ^                   Monitoring = CloudWatch
      v             |
   Pub/Sub Topic ---+         Firestore
   "merge-tasks"              campaigns / videos
@@ -370,10 +372,10 @@
     <tr><td>Frontend</td><td>React 18, TypeScript, Vite, Tailwind</td><td>Fast dev, strong typing</td></tr>
     <tr><td>API</td><td>Python 3.11, FastAPI</td><td>Async, auto-docs, Pydantic validation</td></tr>
     <tr><td>Video</td><td>FFmpeg</td><td>Industry standard, concat demuxer for lossless merge</td></tr>
-    <tr><td>State</td><td>Firestore (Native)</td><td>Serverless, real-time, auto-scales</td></tr>
-    <tr><td>Queue</td><td>Pub/Sub</td><td>Unlimited fan-out, built-in DLQ</td></tr>
-    <tr><td>Storage</td><td>Cloud Storage</td><td>Signed URLs, no rate limits</td></tr>
-    <tr><td>Compute</td><td>Cloud Run (3 services)</td><td>Scale to zero (API/frontend), autoscale workers</td></tr>
+    <tr><td>State</td><td>Firestore <span class="aws">[DynamoDB]</span></td><td>Serverless, real-time, auto-scales</td></tr>
+    <tr><td>Queue</td><td>Pub/Sub <span class="aws">[SNS+SQS]</span></td><td>Unlimited fan-out, built-in DLQ</td></tr>
+    <tr><td>Storage</td><td>Cloud Storage <span class="aws">[S3]</span></td><td>Signed URLs, no rate limits</td></tr>
+    <tr><td>Compute</td><td>Cloud Run <span class="aws">[Fargate]</span></td><td>Scale to zero (API/frontend), autoscale workers</td></tr>
     <tr><td>IaC</td><td>Terraform</td><td>Reproducible, version-controlled</td></tr>
   </table>
 </div>
@@ -384,11 +386,11 @@
   <div style="display:flex; flex-direction:column; gap:16px; margin-top:8px;">
     <div class="card" style="display:flex; align-items:center; gap:16px;">
       <span class="big-number" style="font-size:2rem; min-width:36px;">1</span>
-      <div><strong style="color:var(--text)">Get signed URL</strong><br><span style="font-size:1rem;">POST /api/upload/signed-url &rarr; GCS signed upload URL (60min expiry)</span></div>
+      <div><strong style="color:var(--text)">Get signed URL</strong><br><span style="font-size:1rem;">POST /api/upload/signed-url &rarr; GCS <span class="aws">[S3]</span> signed upload URL (60min expiry)</span></div>
     </div>
     <div class="card" style="display:flex; align-items:center; gap:16px;">
       <span class="big-number" style="font-size:2rem; min-width:36px;">2</span>
-      <div><strong style="color:var(--text)">Direct upload to GCS</strong><br><span style="font-size:1rem;">Browser PUTs video bytes directly to Cloud Storage. API never touches video data.</span></div>
+      <div><strong style="color:var(--text)">Direct upload to GCS <span class="aws">[S3]</span></strong><br><span style="font-size:1rem;">Browser PUTs video bytes directly to Cloud Storage. API never touches video data.</span></div>
     </div>
     <div class="card" style="display:flex; align-items:center; gap:16px;">
       <span class="big-number" style="font-size:2rem; min-width:36px;">3</span>
@@ -396,11 +398,11 @@
     </div>
     <div class="card" style="display:flex; align-items:center; gap:16px;">
       <span class="big-number" style="font-size:2rem; min-width:36px;">4</span>
-      <div><strong style="color:var(--text)">Launch &rarr; Pub/Sub fan-out</strong><br><span style="font-size:1rem;">N intros x M mains = N*M messages published instantly to "merge-tasks" topic</span></div>
+      <div><strong style="color:var(--text)">Launch &rarr; Pub/Sub <span class="aws">[SNS+SQS]</span> fan-out</strong><br><span style="font-size:1rem;">N intros x M mains = N*M messages published instantly to "merge-tasks" topic</span></div>
     </div>
     <div class="card" style="display:flex; align-items:center; gap:16px;">
       <span class="big-number" style="font-size:2rem; min-width:36px;">5</span>
-      <div><strong style="color:var(--text)">Worker processes</strong><br><span style="font-size:1rem;">Pull message &rarr; download from GCS &rarr; FFmpeg merge &rarr; upload to GCS &rarr; update Firestore</span></div>
+      <div><strong style="color:var(--text)">Worker processes</strong><br><span style="font-size:1rem;">Pull message &rarr; download from GCS <span class="aws">[S3]</span> &rarr; FFmpeg merge &rarr; upload to GCS &rarr; update Firestore <span class="aws">[DynamoDB]</span></span></div>
     </div>
   </div>
 </div>
@@ -421,14 +423,14 @@
       <h3>Reliability</h3>
       <ul>
         <li><span class="highlight">Idempotent:</span> skips already-completed combinations</li>
-        <li><span class="highlight">Always acks</span> Pub/Sub messages (no infinite redelivery)</li>
-        <li>Failed combinations tracked in Firestore with error detail</li>
+        <li><span class="highlight">Always acks</span> Pub/Sub <span class="aws">[SQS]</span> messages (no infinite redelivery)</li>
+        <li>Failed combinations tracked in Firestore <span class="aws">[DynamoDB]</span> with error detail</li>
         <li>Dead-letter topic after 5 retries</li>
       </ul>
     </div>
   </div>
   <div style="margin-top:24px;">
-    <h3>Cloud Run Config</h3>
+    <h3>Cloud Run <span class="aws">[Fargate]</span> Config</h3>
     <table>
       <tr><th>Setting</th><th>Value</th><th>Why</th></tr>
       <tr><td>CPU</td><td>4 vCPU</td><td>FFmpeg is CPU-bound</td></tr>
@@ -459,11 +461,11 @@
   </div>
   <div class="grid grid-2">
     <div class="card">
-      <h3>Why Pub/Sub (not Cloud Tasks)</h3>
+      <h3>Why Pub/Sub <span class="aws">[SNS+SQS]</span></h3>
       <p>Cloud Tasks caps at 500 dispatches/sec. A 100-combo campaign at 100K DAU needs instant fan-out. Pub/Sub: unlimited, built-in DLQ, lower cost.</p>
     </div>
     <div class="card">
-      <h3>Why GCS (not Drive)</h3>
+      <h3>Why GCS <span class="aws">[S3]</span> (not Drive)</h3>
       <p>Drive: 12K API req / 100s / project. At 100K DAU, exceeded in seconds. GCS signed URLs bypass API entirely -- browser talks direct to storage.</p>
     </div>
   </div>
@@ -476,7 +478,7 @@
   git push origin main
          |
          v
-  Cloud Build Trigger (auto)
+  Cloud Build Trigger (auto)   [CodePipeline]
          |
     +----+----+
     |         |            (parallel builds)
@@ -485,7 +487,7 @@
   Backend   Frontend
     |         |
     v         v            (parallel push)
-  Push to Artifact Registry
+  Push to Artifact Registry    [ECR]
   tagged $SHORT_SHA + latest
     |
     +--------+---------+
@@ -501,16 +503,16 @@
 <div class="slide" id="slide-12">
   <h2>GCP Resources (Terraform)</h2>
   <table>
-    <tr><th>Resource</th><th>Type</th><th>Key Config</th></tr>
-    <tr><td>vgen-api</td><td>Cloud Run</td><td>2 CPU, 2Gi, scales to zero</td></tr>
-    <tr><td>vgen-worker</td><td>Cloud Run</td><td>4 CPU, 8Gi, concurrency=1, min=1</td></tr>
-    <tr><td>vgen-frontend</td><td>Cloud Run</td><td>nginx, scales to zero</td></tr>
-    <tr><td>uploads bucket</td><td>GCS</td><td>User-uploaded source videos</td></tr>
-    <tr><td>outputs bucket</td><td>GCS</td><td>Merged output videos</td></tr>
-    <tr><td>merge-tasks</td><td>Pub/Sub</td><td>Fan-out topic for merge jobs</td></tr>
-    <tr><td>merge-tasks-sub</td><td>Pub/Sub</td><td>Pull, ack 600s, 5 retries, DLQ</td></tr>
-    <tr><td>(default)</td><td>Firestore</td><td>Native mode, 3 collections</td></tr>
-    <tr><td>vgen</td><td>Artifact Registry</td><td>Docker images</td></tr>
+    <tr><th>Resource</th><th>GCP <span class="aws">[AWS]</span></th><th>Key Config</th></tr>
+    <tr><td>vgen-api</td><td>Cloud Run <span class="aws">[Fargate]</span></td><td>2 CPU, 2Gi, scales to zero</td></tr>
+    <tr><td>vgen-worker</td><td>Cloud Run <span class="aws">[Fargate]</span></td><td>4 CPU, 8Gi, concurrency=1, min=1</td></tr>
+    <tr><td>vgen-frontend</td><td>Cloud Run <span class="aws">[Fargate]</span></td><td>nginx, scales to zero</td></tr>
+    <tr><td>uploads bucket</td><td>GCS <span class="aws">[S3]</span></td><td>User-uploaded source videos</td></tr>
+    <tr><td>outputs bucket</td><td>GCS <span class="aws">[S3]</span></td><td>Merged output videos</td></tr>
+    <tr><td>merge-tasks</td><td>Pub/Sub <span class="aws">[SNS]</span></td><td>Fan-out topic for merge jobs</td></tr>
+    <tr><td>merge-tasks-sub</td><td>Pub/Sub <span class="aws">[SQS]</span></td><td>Pull, ack 600s, 5 retries, DLQ</td></tr>
+    <tr><td>(default)</td><td>Firestore <span class="aws">[DynamoDB]</span></td><td>Native mode, 3 collections</td></tr>
+    <tr><td>vgen</td><td>Artifact Reg <span class="aws">[ECR]</span></td><td>Docker images</td></tr>
   </table>
   <p style="margin-top:12px;">All managed via Terraform. State in <code>gs://sandbox-456317-tf-state/vgen</code></p>
 </div>
@@ -518,7 +520,7 @@
 <!-- ===== SLIDE 13: Monitoring & Alerting ===== -->
 <div class="slide" id="slide-13">
   <h2>Monitoring &amp; Alerting</h2>
-  <p style="margin-bottom:16px;">All configured via Terraform in <code>monitoring.tf</code>. View in <span class="highlight">Console &gt; Monitoring</span></p>
+  <p style="margin-bottom:16px;">All configured via Terraform in <code>monitoring.tf</code>. View in <span class="highlight">Console &gt; Monitoring <span class="aws">[CloudWatch]</span></span></p>
   <div class="grid grid-2">
     <div class="card">
       <h3>Dashboard (8 widgets)</h3>
