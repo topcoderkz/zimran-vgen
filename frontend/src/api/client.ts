@@ -1,6 +1,7 @@
 import type { Campaign, CombinationResult, QualitySettings, SignedUrlResponse, Video } from '../types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+// Runtime config: injected by Docker entrypoint, or Vite env for local dev
+const API_URL = (window as any).__VITE_API_URL__ || import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {

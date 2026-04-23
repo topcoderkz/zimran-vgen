@@ -424,16 +424,18 @@ gcloud auth configure-docker us-central1-docker.pkg.dev
 ### Step 2: Build and push Docker images
 
 ```bash
-# Backend image (API + worker)
-docker build -t us-central1-docker.pkg.dev/sandbox-456317/vgen/backend:latest .
+# Build for linux/amd64 (required -- Cloud Run doesn't support ARM)
+docker build --platform linux/amd64 \
+  -t us-central1-docker.pkg.dev/sandbox-456317/vgen/backend:latest .
 docker push us-central1-docker.pkg.dev/sandbox-456317/vgen/backend:latest
 
-# Frontend image
-docker build -f Dockerfile.frontend \
-  --build-arg VITE_API_URL=https://vgen-api-<hash>.us-central1.run.app/api \
+# Frontend (no build-arg needed -- API URL is injected at runtime)
+docker build --platform linux/amd64 -f Dockerfile.frontend \
   -t us-central1-docker.pkg.dev/sandbox-456317/vgen/frontend:latest .
 docker push us-central1-docker.pkg.dev/sandbox-456317/vgen/frontend:latest
 ```
+
+> **Note:** The frontend API URL (`VITE_API_URL`) is injected at container startup, not build time. Terraform sets it automatically from the API service URL.
 
 ### Step 3: Deploy with Terraform
 

@@ -285,14 +285,16 @@ Cost per 1,000 merges (stream-copy):
 frontend/
   src/
     components/           # Reusable UI components
-    pages/                # Dashboard, CampaignBuilder, CampaignDetail, Results
-    hooks/                # useUpload, useCampaign, useProgress
+    pages/                # Dashboard, CampaignBuilder, CampaignDetail
+    hooks/                # useUpload
     api/                  # API client (fetch wrapper, types)
     types/                # TypeScript interfaces
   public/
-  index.html
+  index.html              # Loads /config.js for runtime API URL
+  nginx.conf
+  docker-entrypoint.sh    # Injects VITE_API_URL at container start
+  Dockerfile.dev
   vite.config.ts
-  tailwind.config.ts
   tsconfig.json
   package.json
 
@@ -418,6 +420,8 @@ push to main
 
 10. **Frontend on Cloud Run** -- serves static build via nginx. Could move to Cloud CDN + GCS static hosting for lower cost at scale.
 
+11. **Runtime API URL injection** -- `VITE_API_URL` is injected at container start via `docker-entrypoint.sh` which writes `/config.js`. This avoids rebuilding the frontend when the API URL changes and solves the chicken-and-egg problem where the API URL isn't known at build time.
+
 ## Sandbox Environment
 
 | Resource | Value |
@@ -433,3 +437,7 @@ push to main
 | Artifact Registry | `us-central1-docker.pkg.dev/sandbox-456317/vgen` |
 | Terraform State | `gs://sandbox-456317-tf-state/vgen` |
 | GCP Account | `sandbox1@zimran.io` |
+| Frontend URL | `https://vgen-frontend-kuvjowj3aq-uc.a.run.app` |
+| API URL | `https://vgen-api-kuvjowj3aq-uc.a.run.app` |
+| Cloud Build Trigger | `vgen-deploy-on-push` (push to main) |
+| GitHub Repo | `topcoderkz/zimran-vgen` |

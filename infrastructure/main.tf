@@ -253,6 +253,11 @@ resource "google_cloud_run_v2_service" "frontend" {
         container_port = 80
       }
 
+      env {
+        name  = "VITE_API_URL"
+        value = "${google_cloud_run_v2_service.api.uri}/api"
+      }
+
       resources {
         limits = {
           cpu    = "1"
