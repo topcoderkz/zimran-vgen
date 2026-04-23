@@ -14,4 +14,5 @@ def health(request: Request) -> dict:
         "status": "healthy",
         "version": settings.app_version,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "vgen-api",
     }
