@@ -1,5 +1,8 @@
 import datetime
 
+import google.auth
+import google.auth.transport.requests
+from google.auth import compute_engine
 import structlog
 from google.cloud import storage
 
@@ -11,6 +14,34 @@ class StorageClient:
 
     def __init__(self, project_id: str) -> None:
         self._client = storage.Client(project=project_id)
+        # For signing URLs on Cloud Run (compute credentials can't sign directly)
+        self._signing_credentials = None
+        try:
+            credentials, _ = google.auth.default()
+            if isinstance(credentials, compute_engine.Credentials):
+                request = google.auth.transport.requests.Request()
+                credentials.refresh(request)
+                self._signing_credentials = compute_engine.IDTokenCredentials(
+                    request=request,
+                    target_audience="",
+                    service_account_email=credentials.service_account_email,
+                )
+                self._service_account_email = credentials.service_account_email
+                logger.info("gcs_using_iam_signing", sa=self._service_account_email)
+        except Exception:
+            logger.debug("gcs_using_default_signing")
+
+    def _get_signing_kwargs(self) -> dict:
+        """Return kwargs for generate_signed_url when on Cloud Run."""
+        if self._service_account_email:
+            return {"service_account_email": self._service_account_email, "access_token": self._get_access_token()}
+        return {}
+
+    def _get_access_token(self) -> str:
+        credentials, _ = google.auth.default()
+        request = google.auth.transport.requests.Request()
+        credentials.refresh(request)
+        return credentials.token
 
     def generate_signed_upload_url(
         self,
@@ -26,6 +57,7 @@ class StorageClient:
             expiration=datetime.timedelta(minutes=expiry_minutes),
             method="PUT",
             content_type=content_type,
+            **self._get_signing_kwargs(),
         )
         logger.debug("signed_upload_url_generated", bucket=bucket_name, path=blob_path)
         return url
@@ -42,6 +74,7 @@ class StorageClient:
             version="v4",
             expiration=datetime.timedelta(minutes=expiry_minutes),
             method="GET",
+            **self._get_signing_kwargs(),
         )
         logger.debug("signed_download_url_generated", bucket=bucket_name, path=blob_path)
         return url

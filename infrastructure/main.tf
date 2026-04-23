@@ -49,6 +49,7 @@ resource "google_project_iam_member" "api_roles" {
     "roles/pubsub.publisher",
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
+    "roles/iam.serviceAccountTokenCreator",
   ])
 
   project = var.project_id
@@ -63,6 +64,7 @@ resource "google_project_iam_member" "worker_roles" {
     "roles/pubsub.subscriber",
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
+    "roles/iam.serviceAccountTokenCreator",
   ])
 
   project = var.project_id
