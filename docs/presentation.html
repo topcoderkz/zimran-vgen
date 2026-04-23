@@ -515,8 +515,98 @@
   <p style="margin-top:12px;">All managed via Terraform. State in <code>gs://sandbox-456317-tf-state/vgen</code></p>
 </div>
 
-<!-- ===== SLIDE 13: Current Status ===== -->
+<!-- ===== SLIDE 13: Monitoring & Alerting ===== -->
 <div class="slide" id="slide-13">
+  <h2>Monitoring &amp; Alerting</h2>
+  <p style="margin-bottom:16px;">All configured via Terraform in <code>monitoring.tf</code>. View in <span class="highlight">Console &gt; Monitoring</span></p>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Dashboard (8 widgets)</h3>
+      <p style="margin-bottom:8px;"><span class="highlight">Console &gt; Monitoring &gt; Dashboards &gt; VGen</span></p>
+      <table>
+        <tr><td>Videos Processed</td><td>Success/failure count</td></tr>
+        <tr><td>Processing Time</td><td>Pipeline duration (ms)</td></tr>
+        <tr><td>Errors</td><td>Error count by type</td></tr>
+        <tr><td>Worker Backlog</td><td>Unacked messages in queue</td></tr>
+        <tr><td>DLQ Count</td><td>Dead-letter messages</td></tr>
+        <tr><td>API Requests</td><td>HTTP request count</td></tr>
+        <tr><td>API Latency</td><td>Response time distribution</td></tr>
+        <tr><td>Worker Instances</td><td>Running instance count</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <h3>Alert Policies</h3>
+        <p style="margin-bottom:8px;"><span class="highlight">Console &gt; Monitoring &gt; Alerting</span></p>
+        <ul>
+          <li><strong>API Down</strong> -- health check fails &gt; 10 min</li>
+          <li><strong>Frontend Down</strong> -- uptime check fails &gt; 10 min</li>
+          <li><strong>High Error Rate</strong> -- &gt; 5 errors in 5 min</li>
+          <li><strong>DLQ Accumulating</strong> -- any dead-letter messages</li>
+          <li><strong>Worker Backlog</strong> -- &gt; 50 msgs for 15 min</li>
+        </ul>
+        <p style="margin-top:8px; font-size:0.95rem;">Notifications &rarr; <code>sandbox1@zimran.io</code></p>
+      </div>
+      <div class="card">
+        <h3>Uptime Checks</h3>
+        <p style="margin-bottom:4px;"><span class="highlight">Console &gt; Monitoring &gt; Uptime checks</span></p>
+        <ul>
+          <li>API: <code>GET /api/health</code> every 5 min</li>
+          <li>Frontend: <code>GET /</code> every 5 min</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 14: DLQ & Incident Response ===== -->
+<div class="slide" id="slide-14">
+  <h2>DLQ &amp; Incident Response</h2>
+  <div class="grid grid-2">
+    <div>
+      <h3>Dead-Letter Queue Flow</h3>
+      <pre style="font-size:0.85rem;">
+  Worker fails to process message
+          |
+          v  (Pub/Sub retries x5)
+  Still failing after 5 attempts
+          |
+          v
+  Message &rarr; merge-tasks-dlq topic
+          |
+          v
+  merge-tasks-dlq-sub subscription
+          |
+  +-------+-------+
+  |               |
+  v               v
+  Alert email   API inspection
+  sent          GET /api/dlq/messages
+      </pre>
+    </div>
+    <div>
+      <h3>Inspection API</h3>
+      <div class="card" style="margin-bottom:12px;">
+        <p><strong style="color:var(--text)">Peek at failed messages</strong></p>
+        <pre style="font-size:0.85rem; margin-top:8px; border:none; padding:8px;">curl /api/dlq/messages</pre>
+        <p style="font-size:0.95rem;">Returns combination_id, campaign_id, error details. Messages stay in queue.</p>
+      </div>
+      <div class="card">
+        <p><strong style="color:var(--text)">Dismiss after review</strong></p>
+        <pre style="font-size:0.85rem; margin-top:8px; border:none; padding:8px;">curl -X POST /api/dlq/purge/{msg_id}</pre>
+        <p style="font-size:0.95rem;">Acknowledges and permanently removes the message.</p>
+      </div>
+      <div style="margin-top:16px;">
+        <h3>CLI Alternative</h3>
+        <pre style="font-size:0.85rem;">gcloud pubsub subscriptions pull \
+  merge-tasks-dlq-sub --limit 5</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 15: Current Status ===== -->
+<div class="slide" id="slide-15">
   <h2>Feature Status</h2>
   <div class="grid grid-3">
     <div class="card">
@@ -531,6 +621,10 @@
         <li>Terraform IaC</li>
         <li>Structured logging</li>
         <li>Idempotent processing</li>
+        <li>Monitoring dashboard (8 widgets)</li>
+        <li>Alerting (5 policies + email)</li>
+        <li>DLQ inspection API</li>
+        <li>Uptime checks</li>
       </ul>
     </div>
     <div class="card">
@@ -538,7 +632,6 @@
       <ul>
         <li>Re-encode (ignores quality settings)</li>
         <li>Campaign builder (no multi-step wizard)</li>
-        <li>Metrics (basic, no alerts)</li>
         <li>Results page (inline, no bulk download)</li>
       </ul>
     </div>
@@ -549,14 +642,13 @@
         <li>Tests (empty test dir)</li>
         <li>Retry failed combinations</li>
         <li>Bulk download as zip</li>
-        <li>DLQ monitoring</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- ===== SLIDE 14: Bugs + Tech Debt ===== -->
-<div class="slide" id="slide-14">
+<!-- ===== SLIDE 16: Bugs + Tech Debt ===== -->
+<div class="slide" id="slide-16">
   <h2>Known Issues &amp; Tech Debt</h2>
   <div class="grid grid-2">
     <div class="card" style="border-color:var(--red);">
@@ -573,14 +665,13 @@
         <li><strong>Quality settings ignored</strong> -- CRF, resolution, audio bitrate not passed to FFmpeg during re-encode</li>
         <li><strong>No auth</strong> -- all requests use "default_user"; multi-user unsafe</li>
         <li><strong>No tests</strong> -- zero test coverage</li>
-        <li><strong>DLQ blind spot</strong> -- dead-letter topic exists but nothing monitors it</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- ===== SLIDE 15: Roadmap ===== -->
-<div class="slide" id="slide-15">
+<!-- ===== SLIDE 17: Roadmap ===== -->
+<div class="slide" id="slide-17">
   <h2>Recommended Next Steps</h2>
   <table>
     <tr><th>#</th><th>Item</th><th>Priority</th><th>Effort</th></tr>
@@ -589,14 +680,16 @@
     <tr><td>3</td><td>Write tests (unit for merger/validator, integration for API)</td><td><span class="tag tag-missing">High</span></td><td>Medium</td></tr>
     <tr><td>4</td><td>Implement retry UI + API for failed combinations</td><td><span class="tag tag-partial">Medium</span></td><td>Small</td></tr>
     <tr><td>5</td><td>Bulk download as zip (API endpoint + frontend)</td><td><span class="tag tag-partial">Medium</span></td><td>Small</td></tr>
-    <tr><td>6</td><td>DLQ consumer with alerting</td><td><span class="tag tag-partial">Medium</span></td><td>Small</td></tr>
-    <tr><td>7</td><td>Enhanced metrics + monitoring dashboard</td><td><span class="tag tag-partial">Medium</span></td><td>Medium</td></tr>
-    <tr><td>8</td><td>Multi-step campaign builder wizard</td><td><span class="tag tag-done">Low</span></td><td>Medium</td></tr>
+    <tr><td>6</td><td>Multi-step campaign builder wizard</td><td><span class="tag tag-done">Low</span></td><td>Medium</td></tr>
   </table>
+  <div style="margin-top:24px;">
+    <h3 style="color:var(--green)">Recently Completed</h3>
+    <p>Monitoring dashboard (8 widgets), 5 alert policies, uptime checks, DLQ inspection API, email notifications</p>
+  </div>
 </div>
 
-<!-- ===== SLIDE 16: End ===== -->
-<div class="slide section-divider" id="slide-16">
+<!-- ===== SLIDE 18: End ===== -->
+<div class="slide section-divider" id="slide-18">
   <h1>Questions?</h1>
   <p class="subtitle" style="margin-top:16px;">
     Frontend: <span class="highlight">vgen-frontend-kuvjowj3aq-uc.a.run.app</span><br>
@@ -608,7 +701,7 @@
 <!-- Navigation -->
 <div class="nav">
   <button onclick="prevSlide()" id="btn-prev">&larr;</button>
-  <span class="counter" id="counter">1 / 16</span>
+  <span class="counter" id="counter">1 / 18</span>
   <button onclick="nextSlide()" id="btn-next">&rarr;</button>
 </div>
 
