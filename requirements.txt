@@ -1,0 +1,23 @@
+# Web framework
+fastapi>=0.115
+uvicorn[standard]>=0.34
+
+# Google Cloud
+google-cloud-storage>=2.19
+google-cloud-firestore>=2.19
+google-cloud-pubsub>=2.27
+google-cloud-monitoring>=2.24
+google-cloud-logging>=3.11
+
+# Configuration
+pydantic-settings>=2.7
+
+# Logging
+structlog>=24.4
+
+# HTTP client
+httpx>=0.28
+
+# Testing
+pytest>=8.3
+pytest-asyncio>=0.25

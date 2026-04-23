@@ -1,0 +1,75 @@
+"""Pub/Sub pull subscriber for processing merge tasks.
+
+Entry point: python -m src.worker.consumer
+"""
+
+import json
+import signal
+import sys
+
+import structlog
+from google.cloud import pubsub_v1
+
+from src.config import get_settings
+from src.jobs.store import CampaignStore
+from src.observability.logging import setup_logging
+from src.observability.metrics import MetricsClient
+from src.storage.client import StorageClient
+from src.worker.pipeline import process_combination
+
+logger = structlog.get_logger()
+
+_running = True
+
+
+def _handle_signal(signum: int, frame: object) -> None:
+    global _running
+    logger.info("shutdown_signal", signal=signum)
+    _running = False
+
+
+def main() -> None:
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+    settings = get_settings()
+    setup_logging(settings.log_level)
+
+    store = CampaignStore(settings.gcp_project_id, settings.firestore_collection_prefix)
+    gcs = StorageClient(settings.gcp_project_id)
+    metrics = MetricsClient(settings.gcp_project_id)
+
+    subscriber = pubsub_v1.SubscriberClient()
+    subscription_path = subscriber.subscription_path(
+        settings.gcp_project_id, settings.pubsub_subscription
+    )
+
+    def callback(message: pubsub_v1.subscriber.message.Message) -> None:
+        try:
+            payload = json.loads(message.data.decode("utf-8"))
+            logger.info(
+                "message_received",
+                combination_id=payload.get("combination_id"),
+                campaign_id=payload.get("campaign_id"),
+            )
+            process_combination(settings, store, gcs, metrics, payload)
+            message.ack()
+            logger.info("message_acked", combination_id=payload.get("combination_id"))
+        except Exception as exc:
+            logger.error("message_processing_failed", error=str(exc)[:500])
+            message.nack()
+
+    streaming_pull = subscriber.subscribe(subscription_path, callback=callback)
+    logger.info("worker_started", subscription=subscription_path)
+
+    try:
+        streaming_pull.result()
+    except Exception:
+        streaming_pull.cancel()
+        streaming_pull.result()
+
+    logger.info("worker_stopped")
+
+
+if __name__ == "__main__":
+    main()

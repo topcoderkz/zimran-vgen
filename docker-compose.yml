@@ -1,0 +1,65 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080/api
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - api
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-local-dev}
+      - GCS_UPLOAD_BUCKET=${GCS_UPLOAD_BUCKET:-local-uploads}
+      - GCS_OUTPUT_BUCKET=${GCS_OUTPUT_BUCKET:-local-outputs}
+      - PUBSUB_TOPIC=merge-tasks
+      - PUBSUB_SUBSCRIPTION=merge-tasks-sub
+      - FIRESTORE_EMULATOR_HOST=firestore:8681
+      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - STORAGE_EMULATOR_HOST=http://gcs:4443
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      - firestore
+      - pubsub
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["python", "-m", "src.worker.consumer"]
+    environment:
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-local-dev}
+      - GCS_UPLOAD_BUCKET=${GCS_UPLOAD_BUCKET:-local-uploads}
+      - GCS_OUTPUT_BUCKET=${GCS_OUTPUT_BUCKET:-local-outputs}
+      - PUBSUB_SUBSCRIPTION=merge-tasks-sub
+      - FIRESTORE_EMULATOR_HOST=firestore:8681
+      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - STORAGE_EMULATOR_HOST=http://gcs:4443
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      - firestore
+      - pubsub
+    restart: unless-stopped
+
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud emulators firestore start --host-port=0.0.0.0:8681
+    ports:
+      - "8681:8681"
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
+    ports:
+      - "8085:8085"

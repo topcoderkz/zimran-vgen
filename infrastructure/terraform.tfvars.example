@@ -1,0 +1,5 @@
+# Sandbox: project_id = "sandbox-456317"
+project_id   = "your-gcp-project-id"
+region       = "us-central1"
+github_owner = "your-github-username"
+github_repo  = "zimran-vgen"
