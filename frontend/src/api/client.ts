@@ -37,6 +37,12 @@ export const startCampaign = (id: string) =>
     method: 'POST',
   })
 
+// Videos
+export const listVideos = (campaignId: string, type?: 'intro' | 'main') => {
+  const params = type ? `?type=${type}` : ''
+  return request<Video[]>(`/campaigns/${campaignId}/videos${params}`)
+}
+
 // Uploads
 export const getSignedUploadUrl = (campaignId: string, type: 'intro' | 'main', filename: string) =>
   request<SignedUrlResponse>('/upload/signed-url', {

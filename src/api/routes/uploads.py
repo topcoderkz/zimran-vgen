@@ -13,6 +13,12 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api", tags=["uploads"])
 
 
+@router.get("/campaigns/{campaign_id}/videos")
+def list_videos(campaign_id: str, request: Request, type: str | None = None) -> list[dict]:
+    store: CampaignStore = request.app.state.store
+    return store.list_videos(campaign_id, video_type=type)
+
+
 class SignedUrlRequest(BaseModel):
     campaign_id: str
     type: str  # "intro" or "main"

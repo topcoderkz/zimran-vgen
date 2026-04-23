@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getCampaign, startCampaign, listResults } from '../api/client'
+import { getCampaign, startCampaign, listResults, listVideos } from '../api/client'
 import { useUpload } from '../hooks/useUpload'
-import type { Campaign, CombinationResult } from '../types'
+import type { Campaign, CombinationResult, Video } from '../types'
 
 export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>()
   const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [intros, setIntros] = useState<Video[]>([])
+  const [mains, setMains] = useState<Video[]>([])
   const [results, setResults] = useState<CombinationResult[]>([])
   const [starting, setStarting] = useState(false)
   const introUpload = useUpload(id!)
@@ -17,6 +19,8 @@ export default function CampaignDetail() {
   const refresh = useCallback(() => {
     if (!id) return
     getCampaign(id).then(setCampaign)
+    listVideos(id, 'intro').then(setIntros).catch(() => {})
+    listVideos(id, 'main').then(setMains).catch(() => {})
     listResults(id).then(setResults).catch(() => {})
   }, [id])
 
@@ -77,8 +81,23 @@ export default function CampaignDetail() {
       {/* Upload section -- only in draft */}
       {campaign.status === 'draft' && (
         <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* Intros */}
           <div className="p-4 border border-dashed border-gray-300 rounded-lg">
-            <h3 className="font-medium text-gray-700 mb-2">Intro Videos</h3>
+            <h3 className="font-medium text-gray-700 mb-2">
+              Intro Videos ({intros.length})
+            </h3>
+            {intros.length > 0 && (
+              <ul className="mb-3 space-y-1">
+                {intros.map(v => (
+                  <li key={v.id} className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                    <span className="truncate">{v.filename}</span>
+                    {v.duration_seconds != null && (
+                      <span className="text-xs text-gray-400 ml-2 shrink-0">{v.duration_seconds.toFixed(1)}s</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
             <input
               ref={introRef}
               type="file"
@@ -92,13 +111,28 @@ export default function CampaignDetail() {
               disabled={introUpload.uploading}
               className="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
             >
-              {introUpload.uploading ? `Uploading... ${introUpload.progress}%` : 'Choose intros'}
+              {introUpload.uploading ? `Uploading... ${introUpload.progress}%` : '+ Add intros'}
             </button>
             {introUpload.error && <p className="text-red-500 text-xs mt-1">{introUpload.error}</p>}
           </div>
 
+          {/* Mains */}
           <div className="p-4 border border-dashed border-gray-300 rounded-lg">
-            <h3 className="font-medium text-gray-700 mb-2">Main Videos</h3>
+            <h3 className="font-medium text-gray-700 mb-2">
+              Main Videos ({mains.length})
+            </h3>
+            {mains.length > 0 && (
+              <ul className="mb-3 space-y-1">
+                {mains.map(v => (
+                  <li key={v.id} className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                    <span className="truncate">{v.filename}</span>
+                    {v.duration_seconds != null && (
+                      <span className="text-xs text-gray-400 ml-2 shrink-0">{v.duration_seconds.toFixed(1)}s</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
             <input
               ref={mainRef}
               type="file"
@@ -112,21 +146,28 @@ export default function CampaignDetail() {
               disabled={mainUpload.uploading}
               className="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
             >
-              {mainUpload.uploading ? `Uploading... ${mainUpload.progress}%` : 'Choose mains'}
+              {mainUpload.uploading ? `Uploading... ${mainUpload.progress}%` : '+ Add mains'}
             </button>
             {mainUpload.error && <p className="text-red-500 text-xs mt-1">{mainUpload.error}</p>}
           </div>
         </div>
       )}
 
+      {/* Combination preview */}
+      {campaign.status === 'draft' && intros.length > 0 && mains.length > 0 && (
+        <p className="text-sm text-gray-500 mb-3">
+          {intros.length} intro{intros.length > 1 ? 's' : ''} x {mains.length} main{mains.length > 1 ? 's' : ''} = <strong>{intros.length * mains.length} combinations</strong>
+        </p>
+      )}
+
       {/* Start button */}
       {campaign.status === 'draft' && (
         <button
           onClick={handleStart}
-          disabled={starting}
+          disabled={starting || intros.length === 0 || mains.length === 0}
           className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium mb-6"
         >
-          {starting ? 'Starting...' : 'Start Processing'}
+          {starting ? 'Starting...' : `Start Processing${intros.length > 0 && mains.length > 0 ? ` (${intros.length * mains.length} videos)` : ''}`}
         </button>
       )}
 
