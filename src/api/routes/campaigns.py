@@ -122,3 +122,41 @@ def start_campaign(campaign_id: str, request: Request) -> StartCampaignResponse:
 
     logger.info("campaign_started", campaign_id=campaign_id, total_combinations=total)
     return StartCampaignResponse(status="processing", total_combinations=total)
+
+
+@router.post("/{campaign_id}/combinations/{combination_id}/retry")
+def retry_combination(campaign_id: str, combination_id: str, request: Request) -> dict:
+    store: CampaignStore = request.app.state.store
+    publisher: MergePublisher = request.app.state.publisher
+
+    combo = store.get_combination(combination_id)
+    if not combo:
+        raise HTTPException(status_code=404, detail="Combination not found")
+    if combo["status"] != "failed":
+        raise HTTPException(status_code=400, detail=f"Combination is {combo['status']}, not failed")
+
+    campaign = store.get_campaign(campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    intro = store.get_video(combo["intro_video_id"])
+    main = store.get_video(combo["main_video_id"])
+    if not intro or not main:
+        raise HTTPException(status_code=400, detail="Source video(s) missing")
+
+    # Reset combination and adjust campaign counts
+    store.reset_combination_for_retry(combination_id)
+    store.decrement_failed(campaign_id)
+
+    # Republish to Pub/Sub
+    publisher.publish_combination({
+        "combination_id": combination_id,
+        "campaign_id": campaign_id,
+        "intro_gcs_path": intro["gcs_path"],
+        "main_gcs_path": main["gcs_path"],
+        "output_gcs_path": combo["output_gcs_path"],
+        "quality": campaign["quality"],
+    })
+
+    logger.info("combination_retried", combination_id=combination_id, campaign_id=campaign_id)
+    return {"id": combination_id, "status": "pending"}

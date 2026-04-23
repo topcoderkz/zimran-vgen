@@ -71,3 +71,8 @@ export const listResults = (campaignId: string, status?: string) => {
 
 export const getDownloadUrl = (combinationId: string) =>
   request<{ download_url: string }>(`/download/${combinationId}`)
+
+export const retryCombination = (campaignId: string, combinationId: string) =>
+  request<{ id: string; status: string }>(`/campaigns/${campaignId}/combinations/${combinationId}/retry`, {
+    method: 'POST',
+  })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getCampaign, startCampaign, listResults, listVideos } from '../api/client'
+import { getCampaign, startCampaign, listResults, listVideos, retryCombination } from '../api/client'
 import { useUpload } from '../hooks/useUpload'
 import type { Campaign, CombinationResult, Video } from '../types'
 
@@ -11,6 +11,7 @@ export default function CampaignDetail() {
   const [mains, setMains] = useState<Video[]>([])
   const [results, setResults] = useState<CombinationResult[]>([])
   const [starting, setStarting] = useState(false)
+  const [retrying, setRetrying] = useState<string | null>(null)
   const introUpload = useUpload(id!)
   const mainUpload = useUpload(id!)
   const introRef = useRef<HTMLInputElement>(null)
@@ -47,6 +48,17 @@ export default function CampaignDetail() {
       refresh()
     } finally {
       setStarting(false)
+    }
+  }
+
+  async function handleRetry(combinationId: string) {
+    if (!id) return
+    setRetrying(combinationId)
+    try {
+      await retryCombination(id, combinationId)
+      refresh()
+    } finally {
+      setRetrying(null)
     }
   }
 
@@ -207,7 +219,7 @@ export default function CampaignDetail() {
                     <td className="py-2 text-gray-500">
                       {r.duration_seconds ? `${r.duration_seconds.toFixed(1)}s` : '-'}
                     </td>
-                    <td className="py-2">
+                    <td className="py-2 space-x-2">
                       {r.download_url && (
                         <a
                           href={r.download_url}
@@ -216,6 +228,15 @@ export default function CampaignDetail() {
                         >
                           Download
                         </a>
+                      )}
+                      {r.status === 'failed' && (
+                        <button
+                          onClick={() => handleRetry(r.id)}
+                          disabled={retrying === r.id}
+                          className="text-orange-600 hover:underline disabled:opacity-50"
+                        >
+                          {retrying === r.id ? 'Retrying...' : 'Retry'}
+                        </button>
                       )}
                     </td>
                   </tr>

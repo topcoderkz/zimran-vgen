@@ -70,6 +70,11 @@ class CampaignStore:
             {"failed_count": firestore.Increment(1)}
         )
 
+    def decrement_failed(self, campaign_id: str) -> None:
+        self._db.collection(self._col("campaigns")).document(campaign_id).update(
+            {"failed_count": firestore.Increment(-1), "status": "processing"}
+        )
+
     def check_campaign_done(self, campaign_id: str) -> bool:
         """Check if all combinations are done and update campaign status if so."""
         campaign = self.get_campaign(campaign_id)
@@ -200,6 +205,16 @@ class CampaignStore:
 
     def set_combination_failed(self, combination_id: str, error: str) -> None:
         self.update_combination(combination_id, status="failed", error=error)
+
+    def reset_combination_for_retry(self, combination_id: str) -> None:
+        self.update_combination(
+            combination_id,
+            status="pending",
+            error=None,
+            output_size_bytes=None,
+            output_duration=None,
+            completed_at=None,
+        )
 
     def list_combinations(
         self, campaign_id: str, status: str | None = None
