@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # CORS
+    cors_origins: str = ""
+
     # App
     app_version: str = "1.0.0"
 

@@ -21,6 +21,12 @@ variable "frontend_image" {
   default     = ""
 }
 
+variable "frontend_url" {
+  description = "Frontend Cloud Run URL (for API CORS)"
+  type        = string
+  default     = ""
+}
+
 variable "github_owner" {
   description = "GitHub repository owner (user or org)"
   type        = string
