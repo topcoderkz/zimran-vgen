@@ -69,6 +69,7 @@ def main() -> None:
     )
 
     def callback(message: pubsub_v1.subscriber.message.Message) -> None:
+        payload = None
         try:
             payload = json.loads(message.data.decode("utf-8"))
             logger.info(
@@ -77,11 +78,14 @@ def main() -> None:
                 campaign_id=payload.get("campaign_id"),
             )
             process_combination(settings, store, gcs, metrics, payload)
-            message.ack()
             logger.info("message_acked", combination_id=payload.get("combination_id"))
         except Exception as exc:
             logger.error("message_processing_failed", error=str(exc)[:500])
-            message.nack()
+        finally:
+            # Always ack to prevent infinite redelivery.
+            # Failed combinations are tracked in Firestore;
+            # retries should be handled at the application level.
+            message.ack()
 
     streaming_pull = subscriber.subscribe(subscription_path, callback=callback)
     logger.info("worker_started", subscription=subscription_path)
