@@ -499,7 +499,7 @@ gcloud builds submit --config=cloudbuild.yaml --project=sandbox-456317
 | CORS errors in frontend | API not allowing frontend origin | Check CORS middleware config in `src/api/main.py`. Local dev should allow `localhost:5173` |
 | `Connection refused` on port 8080 | API not running | Start API first: `uvicorn src.api.main:app --port 8080` or `docker compose up` |
 | Signed URL upload returns 403 | URL expired or wrong content-type | URLs expire after 60min. Ensure `Content-Type` header matches what was requested |
-| Worker not processing messages | Pub/Sub subscription misconfigured | Check `PUBSUB_EMULATOR_HOST` is set. Verify subscription exists: `gcloud pubsub subscriptions list` |
+| Worker not processing messages | Pub/Sub subscription misconfigured or Cloud Run scaled to zero | Check `PUBSUB_EMULATOR_HOST` is set (local dev). In production, verify worker has `min-instances=1` (`gcloud run services describe vgen-worker --region us-central1`). The worker is a pull subscriber and Cloud Run will kill it if min instances is 0 |
 | `terraform init` fails | Backend bucket doesn't exist | Create GCS bucket for Terraform state first, or use local backend for dev |
 
 ---

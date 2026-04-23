@@ -78,7 +78,7 @@ class CampaignStore:
         total = campaign["total_combinations"]
         done = campaign["completed_count"] + campaign["failed_count"]
         if done >= total:
-            status = "completed" if campaign["failed_count"] == 0 else "completed"
+            status = "completed" if campaign["failed_count"] == 0 else "failed"
             self.update_campaign(
                 campaign_id,
                 status=status,

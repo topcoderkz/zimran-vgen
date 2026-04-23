@@ -22,7 +22,7 @@ Campaign-based video generation platform where marketing managers upload intro h
                          ^                             v
                          |                    Cloud Run (Workers)
                          |                    FFmpeg merge, 1 per instance
-                         |                    autoscale 0 -> hundreds
+                         |                    autoscale 1 -> 100 (pull subscriber)
                          |                             |
                          +-------- status updates -----+
                                                        |
@@ -49,7 +49,7 @@ Campaign-based video generation platform where marketing managers upload intro h
 | Job state | Firestore (Native mode) | Serverless, real-time listeners for progress, auto-scales |
 | Message queue | Pub/Sub | Unlimited fan-out (vs Cloud Tasks' 500/sec cap), dead-letter support |
 | Storage | Cloud Storage (GCS) | No rate limits (vs Drive's 12K req/100s), signed URLs for direct upload/download |
-| Compute | Cloud Run (3 services: frontend, API, worker) | Autoscale to zero, scale to hundreds of instances |
+| Compute | Cloud Run (3 services: frontend, API, worker) | API/frontend scale to zero; worker min 1 instance (pull subscriber), max 100 |
 | Observability | structlog + Cloud Logging, Cloud Monitoring | Structured JSON logs, custom metric dashboards |
 | IaC | Terraform | Reproducible, version-controlled infrastructure |
 | Container | Docker (python:3.11-slim + ffmpeg) | Consistent environments, non-root user |
@@ -134,6 +134,7 @@ Campaign-based video generation platform where marketing managers upload intro h
 |--------|------|---------|----------|
 | POST | `/api/upload/signed-url` | `{campaign_id, type, filename, content_type}` | `{upload_url, video_id, gcs_path}` |
 | POST | `/api/campaigns/{id}/videos` | `{video_id}` | `{id, type, filename, duration, codec, width, height}` |
+| GET | `/api/campaigns/{id}/videos` | `?type=intro\|main` (optional) | `[{id, type, filename, gcs_path, duration_seconds, codec, width, height}]` |
 
 **Upload flow:**
 1. Frontend calls `POST /api/upload/signed-url` to get a signed GCS upload URL
@@ -145,9 +146,9 @@ Campaign-based video generation platform where marketing managers upload intro h
 
 | Method | Path | Request | Response |
 |--------|------|---------|----------|
-| GET | `/api/campaigns/{id}/results` | `?status=completed` | `[{id, intro_name, main_name, status, output_size, duration, download_url}]` |
+| GET | `/api/campaigns/{id}/results` | `?status=completed` | `[{id, intro_name, main_name, status, output_size_bytes, duration_seconds, download_url}]` |
 | GET | `/api/download/{combination_id}` | -- | `{download_url}` (signed GCS URL, 1hr expiry) |
-| POST | `/api/campaigns/{id}/download-all` | -- | `{archive_url}` (zip of all completed outputs) |
+| POST | `/api/campaigns/{id}/download-all` | -- | **Not yet implemented.** Planned: `{archive_url}` (zip of all completed outputs) |
 
 ### System
 
@@ -163,23 +164,17 @@ Campaign-based video generation platform where marketing managers upload intro h
 - "New Campaign" button
 
 ### 2. Campaign Builder (`/campaigns/new`)
-- **Step 1:** Name the campaign, set quality parameters (codec, resolution, CRF slider, audio)
-- **Step 2:** Upload intro videos (drag-and-drop, multi-file, progress bars)
-- **Step 3:** Upload main videos (same UX)
-- **Step 4:** Preview -- grid showing N intros x M mains = total combinations
-- **Launch button** -- triggers `POST /api/campaigns/{id}/start`
+- Campaign name input
+- Quality settings: codec selector (copy/h264/h265), resolution (original/1080p/720p), CRF slider (shown when codec != "copy")
+- Creates campaign and redirects to Campaign Detail for uploads
 
 ### 3. Campaign Detail (`/campaigns/{id}`)
-- Real-time progress (Firestore onSnapshot or polling)
-- Grid of combinations with status per cell (pending/processing/completed/failed)
-- Retry failed combinations
-- Download individual results or "Download All" as zip
-
-### 4. Results Download (`/campaigns/{id}/results`)
-- Filterable list of completed videos
-- Thumbnail preview (optional, extracted frame)
-- Bulk select + download
-- Individual download buttons
+- **Draft state:** upload sections for intro and main videos (file input, progress bars)
+- Video list with duration and metadata per uploaded file
+- Combination preview (N intros x M mains = total)
+- **Launch button** -- triggers `POST /api/campaigns/{id}/start`
+- **Processing state:** real-time progress via polling (3s interval)
+- **Completed state:** results table with status, size, duration, individual download links
 
 ## Worker Pipeline
 
@@ -189,39 +184,41 @@ Each worker instance processes **one video at a time** (Cloud Run `max_instance_
 1. Pull Pub/Sub message
    {combination_id, campaign_id, intro_gcs_path, main_gcs_path, quality}
 
-2. Update Firestore: combination.status = "processing"
+2. Idempotency check: if combination.status == "completed", skip (Pub/Sub at-least-once)
 
-3. Download intro + main from GCS to /tmp
+3. Update Firestore: combination.status = "processing"
+
+4. Download intro + main from GCS to /tmp
    (direct GCS client, no rate limits, ~2-5s per file)
 
-4. Check compatibility (ffprobe: codec, resolution, fps, audio)
+5. Check compatibility (ffprobe: codec, resolution, fps, audio)
    Compatible + quality.codec == "copy"  --> stream-copy (fast)
-   Incompatible or re-encode requested   --> ffmpeg filter_complex
+   Incompatible or re-encode requested   --> ffmpeg concat with re-encode
 
-5. Merge with FFmpeg
+6. Merge with FFmpeg
    Stream-copy: ~2s for typical 30s videos
    Re-encode:   ~30-60s depending on resolution/length
 
-6. Validate output (ffprobe: duration, size, codec)
+7. Validate output (ffprobe: duration, size, codec)
 
-7. Upload result to GCS: outputs/{campaign_id}/{combination_id}.mp4
+8. Upload result to GCS: outputs/{campaign_id}/{combination_id}.mp4
 
-8. Update Firestore:
+9. Update Firestore:
    - combination.status = "completed"
    - combination.output_gcs_path, output_size_bytes, output_duration
    - campaign.completed_count += 1 (atomic increment)
 
-9. If all combinations done: campaign.status = "completed"
+10. If all combinations done: campaign.status = "completed"
 
-10. Ack Pub/Sub message
+11. Always ack Pub/Sub message (even on failure -- prevents infinite redelivery)
 
 On failure:
    - combination.status = "failed", error = message
    - campaign.failed_count += 1
-   - Nack message (Pub/Sub retries with backoff, up to 5x)
-   - After max retries: message goes to dead-letter topic
+   - Message is acked; failed combinations tracked in Firestore
+   - Retries should be handled at the application level
 
-11. Cleanup: shutil.rmtree(/tmp/workdir)
+12. Cleanup: shutil.rmtree(/tmp/workdir)
 ```
 
 ## Scale Design
@@ -290,7 +287,7 @@ frontend/
     api/                  # API client (fetch wrapper, types)
     types/                # TypeScript interfaces
   public/
-  index.html              # Loads /config.js for runtime API URL
+  index.html              # Loads runtime API URL via window.__VITE_API_URL__
   nginx.conf
   docker-entrypoint.sh    # Injects VITE_API_URL at container start
   Dockerfile.dev
@@ -305,7 +302,7 @@ src/                      # Backend
     routes/
       campaigns.py        # Campaign CRUD + start
       uploads.py          # Signed URL generation + video registration
-      results.py          # Download URLs + zip archive
+      results.py          # Download URLs + results listing
       health.py           # Health check
   jobs/
     store.py              # Firestore-backed state management
@@ -349,8 +346,11 @@ docker-compose.yml        # Local dev: frontend + API + worker + emulators
 | `FIRESTORE_COLLECTION_PREFIX` | no | `""` | Prefix for collection names (for namespacing) |
 | `WORKER_MAX_RETRIES` | no | `5` | Max Pub/Sub delivery attempts |
 | `SIGNED_URL_EXPIRY_MINUTES` | no | `60` | Signed URL expiration |
+| `GCP_REGION` | no | `us-central1` | GCP region |
+| `CORS_ORIGINS` | no | `["*"]` | Allowed CORS origins (JSON list) |
+| `APP_VERSION` | no | `1.0.0` | Version string returned by health endpoint |
 | `LOG_LEVEL` | no | `INFO` | Python log level |
-| `VITE_API_URL` | yes | -- | API URL for frontend (build-time) |
+| `VITE_API_URL` | yes | -- | API URL for frontend (runtime, injected at container start) |
 
 ## Terraform Resources
 
@@ -363,11 +363,11 @@ docker-compose.yml        # Local dev: frontend + API + worker + emulators
 | `google_storage_bucket.uploads` | GCS | User-uploaded source videos |
 | `google_storage_bucket.outputs` | GCS | Merged output videos |
 | `google_pubsub_topic.merge_tasks` | Pub/Sub | Merge job messages |
-| `google_pubsub_subscription.worker` | Pub/Sub | Push to worker Cloud Run |
+| `google_pubsub_subscription.worker` | Pub/Sub | Pull subscription for worker (ack 600s, 5 retries, DLQ) |
 | `google_pubsub_topic.dlq` | Pub/Sub | Dead-letter for failed merges |
 | `google_cloud_run_v2_service.frontend` | Cloud Run | React app (nginx) |
 | `google_cloud_run_v2_service.api` | Cloud Run | FastAPI, 2 CPU / 2Gi |
-| `google_cloud_run_v2_service.worker` | Cloud Run | FFmpeg worker, 4 CPU / 8Gi, concurrency=1 |
+| `google_cloud_run_v2_service.worker` | Cloud Run | FFmpeg worker, 4 CPU / 8Gi, concurrency=1, min 1 instance |
 | `google_monitoring_dashboard.vgen` | Monitoring | Campaigns, throughput, errors, queue depth |
 | `google_artifact_registry_repository.vgen` | Artifact Registry | Docker image storage |
 | `google_cloudbuild_trigger.deploy_on_push` | Cloud Build | Auto-deploy on push to main |
@@ -406,7 +406,7 @@ push to main
 
 3. **GCS over Google Drive** -- Drive API rate limits (12K req/100s) would be exhausted instantly at 100K DAU. GCS has no practical limit and is cheaper.
 
-4. **Worker concurrency = 1** -- video merging is CPU-bound. One merge per instance, Cloud Run autoscales instances. Simpler, no resource contention.
+4. **Worker concurrency = 1, min 1 instance** -- video merging is CPU-bound. One merge per instance, Cloud Run autoscales instances. Min 1 instance required because the worker is a Pub/Sub pull subscriber -- Cloud Run would otherwise scale to zero (no incoming HTTP requests) and never process messages.
 
 5. **Stream-copy when possible** -- if intro and main share codec + resolution, FFmpeg concat demuxer copies streams without re-encoding (~50x faster). Fall back to re-encode only when necessary or when user selects specific quality.
 
@@ -420,7 +420,9 @@ push to main
 
 10. **Frontend on Cloud Run** -- serves static build via nginx. Could move to Cloud CDN + GCS static hosting for lower cost at scale.
 
-11. **Runtime API URL injection** -- `VITE_API_URL` is injected at container start via `docker-entrypoint.sh` which writes `/config.js`. This avoids rebuilding the frontend when the API URL changes and solves the chicken-and-egg problem where the API URL isn't known at build time.
+11. **Runtime API URL injection** -- `VITE_API_URL` is injected at container start via `docker-entrypoint.sh` which writes `window.__VITE_API_URL__` into `index.html`. The frontend client reads this at runtime. This avoids rebuilding the frontend when the API URL changes and solves the chicken-and-egg problem where the API URL isn't known at build time.
+
+12. **Idempotent message processing** -- workers check combination status before processing. If already completed, the message is skipped and acked. This handles Pub/Sub's at-least-once delivery guarantee without corrupting state.
 
 ## Sandbox Environment
 

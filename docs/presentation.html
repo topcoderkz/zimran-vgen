@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VGen -- Video Creative Generation Platform</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --accent: #3b82f6;
+    --accent-dim: #1e3a5f;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #334155;
+    --code-bg: #0d1117;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  .slide {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px 80px;
+    height: 100vh;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .slide.active { display: flex; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 24px;
+    color: var(--accent);
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  p, li {
+    font-size: 1.25rem;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .subtitle {
+    font-size: 1.5rem;
+    color: var(--muted);
+    margin-bottom: 40px;
+  }
+
+  ul { list-style: none; margin-top: 8px; }
+  ul li { padding: 6px 0; padding-left: 24px; position: relative; }
+  ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  .grid { display: grid; gap: 24px; margin-top: 16px; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .card h3 { margin-bottom: 8px; }
+  .card p { font-size: 1.05rem; }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .tag-done { background: #166534; color: #bbf7d0; }
+  .tag-partial { background: #854d0e; color: #fef08a; }
+  .tag-missing { background: #991b1b; color: #fecaca; }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--muted);
+    overflow-x: auto;
+    margin-top: 12px;
+  }
+
+  .highlight { color: var(--accent); font-weight: 600; }
+  .highlight-green { color: var(--green); font-weight: 600; }
+  .highlight-yellow { color: var(--yellow); font-weight: 600; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 1.05rem;
+    color: var(--muted);
+  }
+  th {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    text-align: center;
+    font-size: 1rem;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .flow-arrow {
+    color: var(--accent);
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .big-number {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 1rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .section-divider {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .section-divider h1 { font-size: 3.5rem; }
+
+  /* Navigation */
+  .nav {
+    position: fixed;
+    bottom: 24px;
+    right: 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 100;
+  }
+  .nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  }
+  .nav button:hover { background: var(--accent-dim); }
+  .nav .counter {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent);
+    transition: width 0.3s ease;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progress"></div>
+
+<!-- ===== SLIDE 1: Title ===== -->
+<div class="slide active" id="slide-1">
+  <h3>April 2026</h3>
+  <h1>VGen</h1>
+  <p class="subtitle">Video Creative Generation Platform</p>
+  <p style="font-size:1.15rem; max-width:700px;">
+    Campaign-based video merging at scale. Upload intro hooks and main videos,
+    define quality parameters, get all combinations merged automatically.
+  </p>
+  <div style="margin-top:40px;">
+    <span class="tag tag-done">Live on GCP</span>
+    <span class="tag" style="background:var(--accent-dim);color:var(--accent);">Cloud Run + Pub/Sub + GCS</span>
+  </div>
+</div>
+
+<!-- ===== SLIDE 2: Problem ===== -->
+<div class="slide" id="slide-2">
+  <h2>The Problem</h2>
+  <div class="grid grid-2">
+    <div>
+      <h3>Without VGen</h3>
+      <ul>
+        <li>Marketing manager has 10 intros and 5 main videos</li>
+        <li>Needs 50 unique combinations for ad testing</li>
+        <li>Manual editing in Premiere/Final Cut: hours of work</li>
+        <li>Each new campaign repeats the pain</li>
+      </ul>
+    </div>
+    <div>
+      <h3>With VGen</h3>
+      <ul>
+        <li>Upload intros and mains to a campaign</li>
+        <li>Click "Launch" -- all 50 combinations generated</li>
+        <li>Stream-copy merge: <span class="highlight">under 10 seconds</span></li>
+        <li>Download individually or as a batch</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 3: User Flow ===== -->
+<div class="slide" id="slide-3">
+  <h2>User Flow</h2>
+  <div class="flow">
+    <div class="flow-step">Create<br>Campaign</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">Set Quality<br>(codec, resolution)</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">Upload<br>Intros</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">Upload<br>Mains</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="border-color:var(--accent);background:var(--accent-dim);">Launch</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">Track<br>Progress</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="border-color:var(--green);background:#14532d;">Download<br>Results</div>
+  </div>
+  <div style="margin-top:36px;">
+    <p>Files never pass through the API server. Browser uploads <span class="highlight">directly to Cloud Storage</span> via signed URLs.</p>
+  </div>
+</div>
+
+<!-- ===== SLIDE 4: Demo / Screenshots ===== -->
+<div class="slide" id="slide-4">
+  <h2>Current Frontend</h2>
+  <div class="grid grid-3">
+    <div class="card">
+      <h3>Dashboard</h3>
+      <p>Campaign list with status badges (draft, processing, completed), progress bars, quick access</p>
+    </div>
+    <div class="card">
+      <h3>Campaign Builder</h3>
+      <p>Name the campaign, select codec (copy/h264/h265), resolution, CRF. Creates campaign and redirects to detail page</p>
+    </div>
+    <div class="card">
+      <h3>Campaign Detail</h3>
+      <p>Upload intros/mains, see combination count, launch processing, track real-time progress, download results</p>
+    </div>
+  </div>
+  <div style="margin-top:24px;">
+    <p>Live at: <span class="highlight">https://vgen-frontend-kuvjowj3aq-uc.a.run.app</span></p>
+  </div>
+</div>
+
+<!-- ===== SLIDE 5: Section Divider ===== -->
+<div class="slide section-divider" id="slide-5">
+  <h3>Part 2</h3>
+  <h1>Architecture &amp; Infrastructure</h1>
+  <p class="subtitle">How it works under the hood</p>
+</div>
+
+<!-- ===== SLIDE 6: Architecture ===== -->
+<div class="slide" id="slide-6">
+  <h2>System Architecture</h2>
+  <pre>
+  Browser (React + TypeScript)
+     |                    ^
+     | signed URL upload  | signed URL download
+     v                    |
+  Cloud Storage (GCS)     |
+  /uploads/  /outputs/ ---+
+     ^          ^
+     |          |
+  Cloud Run     Cloud Run (Workers)
+  (API)         FFmpeg merge, 1 per instance
+     |          pull from Pub/Sub
+     |             ^
+     v             |
+  Pub/Sub Topic ---+         Firestore
+  "merge-tasks"              campaigns / videos
+  1 msg per combo            combinations
+  </pre>
+</div>
+
+<!-- ===== SLIDE 7: Tech Stack ===== -->
+<div class="slide" id="slide-7">
+  <h2>Tech Stack</h2>
+  <table>
+    <tr><th>Layer</th><th>Technology</th><th>Why</th></tr>
+    <tr><td>Frontend</td><td>React 18, TypeScript, Vite, Tailwind</td><td>Fast dev, strong typing</td></tr>
+    <tr><td>API</td><td>Python 3.11, FastAPI</td><td>Async, auto-docs, Pydantic validation</td></tr>
+    <tr><td>Video</td><td>FFmpeg</td><td>Industry standard, concat demuxer for lossless merge</td></tr>
+    <tr><td>State</td><td>Firestore (Native)</td><td>Serverless, real-time, auto-scales</td></tr>
+    <tr><td>Queue</td><td>Pub/Sub</td><td>Unlimited fan-out, built-in DLQ</td></tr>
+    <tr><td>Storage</td><td>Cloud Storage</td><td>Signed URLs, no rate limits</td></tr>
+    <tr><td>Compute</td><td>Cloud Run (3 services)</td><td>Scale to zero (API/frontend), autoscale workers</td></tr>
+    <tr><td>IaC</td><td>Terraform</td><td>Reproducible, version-controlled</td></tr>
+  </table>
+</div>
+
+<!-- ===== SLIDE 8: Data Flow ===== -->
+<div class="slide" id="slide-8">
+  <h2>Data Flow -- Upload to Download</h2>
+  <div style="display:flex; flex-direction:column; gap:16px; margin-top:8px;">
+    <div class="card" style="display:flex; align-items:center; gap:16px;">
+      <span class="big-number" style="font-size:2rem; min-width:36px;">1</span>
+      <div><strong style="color:var(--text)">Get signed URL</strong><br><span style="font-size:1rem;">POST /api/upload/signed-url &rarr; GCS signed upload URL (60min expiry)</span></div>
+    </div>
+    <div class="card" style="display:flex; align-items:center; gap:16px;">
+      <span class="big-number" style="font-size:2rem; min-width:36px;">2</span>
+      <div><strong style="color:var(--text)">Direct upload to GCS</strong><br><span style="font-size:1rem;">Browser PUTs video bytes directly to Cloud Storage. API never touches video data.</span></div>
+    </div>
+    <div class="card" style="display:flex; align-items:center; gap:16px;">
+      <span class="big-number" style="font-size:2rem; min-width:36px;">3</span>
+      <div><strong style="color:var(--text)">Register + ffprobe</strong><br><span style="font-size:1rem;">POST /api/campaigns/{id}/videos &rarr; backend runs ffprobe to extract codec, resolution, duration</span></div>
+    </div>
+    <div class="card" style="display:flex; align-items:center; gap:16px;">
+      <span class="big-number" style="font-size:2rem; min-width:36px;">4</span>
+      <div><strong style="color:var(--text)">Launch &rarr; Pub/Sub fan-out</strong><br><span style="font-size:1rem;">N intros x M mains = N*M messages published instantly to "merge-tasks" topic</span></div>
+    </div>
+    <div class="card" style="display:flex; align-items:center; gap:16px;">
+      <span class="big-number" style="font-size:2rem; min-width:36px;">5</span>
+      <div><strong style="color:var(--text)">Worker processes</strong><br><span style="font-size:1rem;">Pull message &rarr; download from GCS &rarr; FFmpeg merge &rarr; upload to GCS &rarr; update Firestore</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 9: Worker Internals ===== -->
+<div class="slide" id="slide-9">
+  <h2>Worker Internals</h2>
+  <div class="grid grid-2">
+    <div>
+      <h3>Merge Strategy</h3>
+      <ul>
+        <li><span class="highlight-green">Stream-copy</span> when intro + main share codec, resolution, fps (~2s)</li>
+        <li><span class="highlight-yellow">Re-encode</span> when incompatible or user selected h264/h265 (~30-60s)</li>
+        <li>Compatibility checked via ffprobe before merge</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Reliability</h3>
+      <ul>
+        <li><span class="highlight">Idempotent:</span> skips already-completed combinations</li>
+        <li><span class="highlight">Always acks</span> Pub/Sub messages (no infinite redelivery)</li>
+        <li>Failed combinations tracked in Firestore with error detail</li>
+        <li>Dead-letter topic after 5 retries</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top:24px;">
+    <h3>Cloud Run Config</h3>
+    <table>
+      <tr><th>Setting</th><th>Value</th><th>Why</th></tr>
+      <tr><td>CPU</td><td>4 vCPU</td><td>FFmpeg is CPU-bound</td></tr>
+      <tr><td>Memory</td><td>8 GiB</td><td>Large video files in /tmp</td></tr>
+      <tr><td>Concurrency</td><td>1</td><td>One merge at a time, no resource contention</td></tr>
+      <tr><td>Min instances</td><td>1</td><td>Pull subscriber needs always-on instance</td></tr>
+      <tr><td>Max instances</td><td>100</td><td>Autoscale for burst load</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ===== SLIDE 10: Scale ===== -->
+<div class="slide" id="slide-10">
+  <h2>Scale Design</h2>
+  <div class="grid grid-3" style="margin-bottom:24px;">
+    <div class="card" style="text-align:center;">
+      <div class="big-number">~7s</div>
+      <div class="stat-label">Per merge (stream-copy)</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="big-number">300+</div>
+      <div class="stat-label">Videos / min / user</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="big-number">$0.35</div>
+      <div class="stat-label">Per 1,000 merges</div>
+    </div>
+  </div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Why Pub/Sub (not Cloud Tasks)</h3>
+      <p>Cloud Tasks caps at 500 dispatches/sec. A 100-combo campaign at 100K DAU needs instant fan-out. Pub/Sub: unlimited, built-in DLQ, lower cost.</p>
+    </div>
+    <div class="card">
+      <h3>Why GCS (not Drive)</h3>
+      <p>Drive: 12K API req / 100s / project. At 100K DAU, exceeded in seconds. GCS signed URLs bypass API entirely -- browser talks direct to storage.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 11: CI/CD ===== -->
+<div class="slide" id="slide-11">
+  <h2>CI/CD Pipeline</h2>
+  <pre>
+  git push origin main
+         |
+         v
+  Cloud Build Trigger (auto)
+         |
+    +----+----+
+    |         |            (parallel builds)
+    v         v
+  Build     Build
+  Backend   Frontend
+    |         |
+    v         v            (parallel push)
+  Push to Artifact Registry
+  tagged $SHORT_SHA + latest
+    |
+    +--------+---------+
+    |        |         |   (parallel deploy)
+    v        v         v
+  vgen-api  vgen-     vgen-
+            worker    frontend
+  </pre>
+  <p style="margin-top:16px;">Machine: E2_HIGHCPU_8 &middot; Timeout: 20min &middot; Trigger: push to main</p>
+</div>
+
+<!-- ===== SLIDE 12: Infrastructure ===== -->
+<div class="slide" id="slide-12">
+  <h2>GCP Resources (Terraform)</h2>
+  <table>
+    <tr><th>Resource</th><th>Type</th><th>Key Config</th></tr>
+    <tr><td>vgen-api</td><td>Cloud Run</td><td>2 CPU, 2Gi, scales to zero</td></tr>
+    <tr><td>vgen-worker</td><td>Cloud Run</td><td>4 CPU, 8Gi, concurrency=1, min=1</td></tr>
+    <tr><td>vgen-frontend</td><td>Cloud Run</td><td>nginx, scales to zero</td></tr>
+    <tr><td>uploads bucket</td><td>GCS</td><td>User-uploaded source videos</td></tr>
+    <tr><td>outputs bucket</td><td>GCS</td><td>Merged output videos</td></tr>
+    <tr><td>merge-tasks</td><td>Pub/Sub</td><td>Fan-out topic for merge jobs</td></tr>
+    <tr><td>merge-tasks-sub</td><td>Pub/Sub</td><td>Pull, ack 600s, 5 retries, DLQ</td></tr>
+    <tr><td>(default)</td><td>Firestore</td><td>Native mode, 3 collections</td></tr>
+    <tr><td>vgen</td><td>Artifact Registry</td><td>Docker images</td></tr>
+  </table>
+  <p style="margin-top:12px;">All managed via Terraform. State in <code>gs://sandbox-456317-tf-state/vgen</code></p>
+</div>
+
+<!-- ===== SLIDE 13: Current Status ===== -->
+<div class="slide" id="slide-13">
+  <h2>Feature Status</h2>
+  <div class="grid grid-3">
+    <div class="card">
+      <h3 style="color:var(--green)">Done</h3>
+      <ul>
+        <li>Campaign CRUD + dashboard</li>
+        <li>Signed URL upload flow</li>
+        <li>Stream-copy merge pipeline</li>
+        <li>Real-time progress tracking</li>
+        <li>Individual download</li>
+        <li>CI/CD auto-deploy</li>
+        <li>Terraform IaC</li>
+        <li>Structured logging</li>
+        <li>Idempotent processing</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--yellow)">Partial</h3>
+      <ul>
+        <li>Re-encode (ignores quality settings)</li>
+        <li>Campaign builder (no multi-step wizard)</li>
+        <li>Metrics (basic, no alerts)</li>
+        <li>Results page (inline, no bulk download)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--red)">Missing</h3>
+      <ul>
+        <li>Authentication (hardcoded user)</li>
+        <li>Tests (empty test dir)</li>
+        <li>Retry failed combinations</li>
+        <li>Bulk download as zip</li>
+        <li>DLQ monitoring</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 14: Bugs + Tech Debt ===== -->
+<div class="slide" id="slide-14">
+  <h2>Known Issues &amp; Tech Debt</h2>
+  <div class="grid grid-2">
+    <div class="card" style="border-color:var(--red);">
+      <h3 style="color:var(--red)">Bugs (Fixed)</h3>
+      <ul>
+        <li><strong>Campaign status bug</strong> -- campaigns with failures were marked "completed" instead of "failed" (fixed 2026-04-23)</li>
+        <li><strong>Worker killed by Cloud Run</strong> -- pull subscriber scaled to zero; fixed with min_instances=1</li>
+        <li><strong>Metrics protobuf error</strong> -- NoneType on timestamp field; fixed with dict construction</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:var(--yellow);">
+      <h3 style="color:var(--yellow)">Open Issues</h3>
+      <ul>
+        <li><strong>Quality settings ignored</strong> -- CRF, resolution, audio bitrate not passed to FFmpeg during re-encode</li>
+        <li><strong>No auth</strong> -- all requests use "default_user"; multi-user unsafe</li>
+        <li><strong>No tests</strong> -- zero test coverage</li>
+        <li><strong>DLQ blind spot</strong> -- dead-letter topic exists but nothing monitors it</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 15: Roadmap ===== -->
+<div class="slide" id="slide-15">
+  <h2>Recommended Next Steps</h2>
+  <table>
+    <tr><th>#</th><th>Item</th><th>Priority</th><th>Effort</th></tr>
+    <tr><td>1</td><td>Wire quality settings to FFmpeg re-encode (CRF, resolution, audio)</td><td><span class="tag tag-missing">High</span></td><td>Small</td></tr>
+    <tr><td>2</td><td>Add authentication (Firebase Auth / JWT middleware)</td><td><span class="tag tag-missing">High</span></td><td>Medium</td></tr>
+    <tr><td>3</td><td>Write tests (unit for merger/validator, integration for API)</td><td><span class="tag tag-missing">High</span></td><td>Medium</td></tr>
+    <tr><td>4</td><td>Implement retry UI + API for failed combinations</td><td><span class="tag tag-partial">Medium</span></td><td>Small</td></tr>
+    <tr><td>5</td><td>Bulk download as zip (API endpoint + frontend)</td><td><span class="tag tag-partial">Medium</span></td><td>Small</td></tr>
+    <tr><td>6</td><td>DLQ consumer with alerting</td><td><span class="tag tag-partial">Medium</span></td><td>Small</td></tr>
+    <tr><td>7</td><td>Enhanced metrics + monitoring dashboard</td><td><span class="tag tag-partial">Medium</span></td><td>Medium</td></tr>
+    <tr><td>8</td><td>Multi-step campaign builder wizard</td><td><span class="tag tag-done">Low</span></td><td>Medium</td></tr>
+  </table>
+</div>
+
+<!-- ===== SLIDE 16: End ===== -->
+<div class="slide section-divider" id="slide-16">
+  <h1>Questions?</h1>
+  <p class="subtitle" style="margin-top:16px;">
+    Frontend: <span class="highlight">vgen-frontend-kuvjowj3aq-uc.a.run.app</span><br>
+    API: <span class="highlight">vgen-api-kuvjowj3aq-uc.a.run.app</span><br>
+    Repo: <span class="highlight">github.com/topcoderkz/zimran-vgen</span>
+  </p>
+</div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button onclick="prevSlide()" id="btn-prev">&larr;</button>
+  <span class="counter" id="counter">1 / 16</span>
+  <button onclick="nextSlide()" id="btn-next">&rarr;</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  function show(n) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(n, total - 1));
+    slides[current].classList.add('active');
+    document.getElementById('counter').textContent = `${current + 1} / ${total}`;
+    document.getElementById('progress').style.width = `${((current + 1) / total) * 100}%`;
+  }
+
+  function nextSlide() { show(current + 1); }
+  function prevSlide() { show(current - 1); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); nextSlide(); }
+    if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); prevSlide(); }
+    if (e.key === 'Home') { e.preventDefault(); show(0); }
+    if (e.key === 'End') { e.preventDefault(); show(total - 1); }
+  });
+
+  // Touch support
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  document.addEventListener('touchend', (e) => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) { diff > 0 ? nextSlide() : prevSlide(); }
+  });
+
+  show(0);
+</script>
+</body>
+</html>

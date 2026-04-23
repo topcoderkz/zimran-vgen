@@ -58,8 +58,11 @@ class MetricsClient:
         )
         series.points = [point]
 
-        self._client.create_time_series(name=self.project_name, time_series=[series])
-        logger.debug("metric_sent", metric=full_type, value=value)
+        try:
+            self._client.create_time_series(name=self.project_name, time_series=[series])
+            logger.debug("metric_sent", metric=full_type, value=value)
+        except Exception as exc:
+            logger.warning("metric_send_failed", metric=full_type, error=str(exc)[:200])
 
     def record_processing_time(self, duration_ms: int, status: str = "success") -> None:
         self.record("processing_time_ms", duration_ms, {"status": status})
