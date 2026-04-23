@@ -49,10 +49,13 @@ class MetricsClient:
             series.metric.labels[k] = v
 
         now = time.time()
-        point = monitoring_v3.Point()
-        point.value.int64_value = value
-        point.interval.end_time.seconds = int(now)
-        point.interval.end_time.nanos = int((now % 1) * 1e9)
+        interval = monitoring_v3.TimeInterval(
+            end_time={"seconds": int(now), "nanos": int((now % 1) * 1e9)},
+        )
+        point = monitoring_v3.Point(
+            interval=interval,
+            value={"int64_value": value},
+        )
         series.points = [point]
 
         self._client.create_time_series(name=self.project_name, time_series=[series])

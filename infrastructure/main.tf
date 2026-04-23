@@ -210,6 +210,11 @@ resource "google_cloud_run_v2_service" "worker" {
     service_account                  = google_service_account.worker.email
     max_instance_request_concurrency = 1
 
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 100
+    }
+
     containers {
       image   = var.backend_image != "" ? var.backend_image : "${var.region}-docker.pkg.dev/${var.project_id}/vgen/backend:latest"
       command = ["python", "-m", "src.worker.consumer"]

@@ -31,6 +31,12 @@ def process_combination(
     combination_id = message["combination_id"]
     campaign_id = message["campaign_id"]
 
+    # Idempotency: skip if already completed (Pub/Sub delivers at-least-once)
+    existing = store.get_combination(combination_id)
+    if existing and existing.get("status") == "completed":
+        logger.info("pipeline_skipped_already_completed", combination_id=combination_id)
+        return
+
     store.set_combination_processing(combination_id)
     start = time.monotonic()
     tmpdir = tempfile.mkdtemp(prefix="vgen_")
