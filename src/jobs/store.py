@@ -44,10 +44,11 @@ class CampaignStore:
         docs = (
             self._db.collection(self._col("campaigns"))
             .where("user_id", "==", user_id)
-            .order_by("created_at", direction=firestore.Query.DESCENDING)
             .stream()
         )
-        return [{"id": d.id, **d.to_dict()} for d in docs]
+        results = [{"id": d.id, **d.to_dict()} for d in docs]
+        results.sort(key=lambda c: c.get("created_at", ""), reverse=True)
+        return results
 
     def update_campaign(self, campaign_id: str, **fields: object) -> None:
         self._db.collection(self._col("campaigns")).document(campaign_id).update(fields)
