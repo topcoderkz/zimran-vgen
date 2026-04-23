@@ -30,16 +30,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="VGen API", version="1.0.0", lifespan=lifespan)
 
-cors_origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-]
-if app.state.settings.cors_origins:
-    cors_origins.extend(app.state.settings.cors_origins.split(","))
+# CORS: read allowed origins at import time (before lifespan runs)
+_settings = get_settings()
+_cors_origins = ["http://localhost:5173", "http://localhost:3000"]
+if _settings.cors_origins:
+    _cors_origins.extend(_settings.cors_origins.split(","))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
